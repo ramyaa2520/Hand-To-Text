@@ -12,11 +12,15 @@ from cvzone.HandTrackingModule import HandDetector
 from string import ascii_uppercase
 import enchant
 import base64
-from flask import Flask, render_template, Response, jsonify, request
+from flask import Flask, render_template, Response, jsonify, request, send_from_directory
 import json
 
 # Initialize the Flask application
 app = Flask(__name__, static_folder='static')
+
+# Register the signs folder as a static folder
+app.static_folder = 'static'
+app.add_url_rule('/static/signs/<path:filename>', endpoint='signs', view_func=app.send_static_file)
 
 # Initialize hand detectors with optimized parameters
 hd = HandDetector(maxHands=1, detectionCon=0.6)
@@ -413,6 +417,31 @@ def process_prediction(white_img, pts):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+# Route to serve sign images
+@app.route('/signs/<filename>')
+def serve_sign(filename):
+    return send_from_directory(os.path.join(os.path.dirname(__file__), 'signs'), filename)
+
+# Route for the learn signs page
+@app.route('/learn')
+def learn():
+    # Get all sign images from the signs folder
+    sign_images = []
+    # Look for images in the root signs directory
+    signs_folder = os.path.join(os.path.dirname(__file__), 'signs')
+    for filename in sorted(os.listdir(signs_folder)):
+        if filename.endswith('.png'):
+            letter = filename.split('.')[0]  # Get the letter from the filename
+            sign_images.append({
+                'letter': letter
+            })
+    return render_template('learn.html', sign_images=sign_images)
+
+# Route for the test yourself page
+@app.route('/test')
+def test():
+    return render_template('test.html')
 
 # API endpoint for processing webcam frames
 @app.route('/process_frame', methods=['POST'])
