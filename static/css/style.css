@@ -1,0 +1,138 @@
+/* Main Styles for Sign Language Conversion App */
+
+/* General Styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+}
+
+/* Header Styles */
+header h1 {
+    font-weight: 700;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Card Styles */
+.card {
+    border-radius: 10px;
+    overflow: hidden;
+    border: none;
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    border-bottom: none;
+    font-weight: 600;
+}
+
+/* Video and Image Containers */
+#webcam {
+    height: 400px;
+    object-fit: cover;
+    background-color: #000;
+}
+
+#processed-image {
+    max-height: 380px;
+    max-width: 100%;
+    display: none;
+}
+
+#no-hand-message {
+    display: block;
+}
+
+/* Text Display Areas */
+.min-height-100 {
+    min-height: 100px;
+}
+
+#sentence {
+    word-wrap: break-word;
+    min-height: 120px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+#current-character {
+    font-size: 4rem;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(13, 110, 253, 0.1);
+    border-radius: 10px;
+}
+
+/* Suggestion Buttons */
+.suggestion-btn {
+    font-size: 1.2rem;
+    min-width: 120px;
+    transition: all 0.2s ease;
+}
+
+.suggestion-btn:hover {
+    transform: scale(1.05);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 992px) {
+    #webcam, #processed-image-container {
+        height: 300px;
+    }
+    
+    #current-character {
+        font-size: 3rem;
+        height: 80px;
+    }
+    
+    .suggestion-btn {
+        font-size: 1rem;
+        min-width: 100px;
+    }
+}
+
+@media (max-width: 768px) {
+    #webcam, #processed-image-container {
+        height: 250px;
+    }
+    
+    #sentence {
+        min-height: 80px;
+    }
+    
+    .suggestion-btn {
+        min-width: 80px;
+    }
+}
+
+/* Animation for loading indicator */
+@keyframes pulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.7);
+    }
+    
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 10px rgba(13, 110, 253, 0);
+    }
+    
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(13, 110, 253, 0);
+    }
+}
+
+.spinner-border {
+    animation: spinner-border 0.75s linear infinite, pulse 2s infinite;
+}
+
+/* Footer Styles */
+footer {
+    margin-top: 2rem;
+}
