@@ -413,9 +413,14 @@ def process_prediction(white_img, pts):
     
     return ch1
 
-# Route for the home page
+# Route for the landing page (default home page)
 @app.route('/')
-def index():
+def landing():
+    return render_template('landing.html')
+
+# Route for the detection page (former index page)
+@app.route('/detection')
+def detection():
     return render_template('index.html')
 
 # Route to serve sign images
