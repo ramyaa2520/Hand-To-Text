@@ -18,9 +18,9 @@ import json
 # Initialize the Flask application
 app = Flask(__name__, static_folder='static')
 
-# Initialize hand detectors
-hd = HandDetector(maxHands=1)
-hd2 = HandDetector(maxHands=1)
+# Initialize hand detectors with optimized parameters
+hd = HandDetector(maxHands=1, detectionCon=0.6)
+hd2 = HandDetector(maxHands=1, detectionCon=0.6)
 
 # Initialize dictionary for spell checking
 ddd = enchant.Dict("en-US")
@@ -67,6 +67,16 @@ word4 = " "
 def distance(x, y):
     return math.sqrt(((x[0] - y[0]) ** 2) + ((x[1] - y[1]) ** 2))
 
+# Function to check if palm is shown (to add character to sentence)
+def check_palm_gesture(pts):
+    # Check if all fingers are extended (palm is open and facing camera)
+    is_palm = (pts[4][1] < pts[3][1] and  # Thumb is up
+              pts[8][1] < pts[6][1] and  # Index finger is extended
+              pts[12][1] < pts[10][1] and  # Middle finger is extended
+              pts[16][1] < pts[14][1] and  # Ring finger is extended
+              pts[20][1] < pts[18][1])  # Pinky is extended
+    return is_palm
+
 # Function to process image and predict sign
 def predict_sign(image_data):
     global prev_char, current_symbol, count, ten_prev_char, str_text, word, word1, word2, word3, word4
@@ -76,6 +86,9 @@ def predict_sign(image_data):
         encoded_data = image_data.split(',')[1]
         nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        # Resize for faster processing
+        frame = cv2.resize(frame, (320, 240))
         
         # Flip the image horizontally for a later selfie-view display
         cv2image = cv2.flip(frame, 1)
@@ -148,23 +161,27 @@ def predict_sign(image_data):
                     # Process the image for prediction
                     ch1 = process_prediction(white, pts)
                     
+                    # Check for palm gesture to add character to sentence
+                    is_palm_shown = check_palm_gesture(pts)
+                    
                     # Update state based on prediction
-                    if ch1 == "next" and prev_char != "next":
-                        if ten_prev_char[(count-2)%10] != "next":
-                            if ten_prev_char[(count-2)%10] == "Backspace":
-                                str_text = str_text[0:-1]
-                            else:
-                                if ten_prev_char[(count-2)%10] != "Backspace":
-                                    str_text = str_text + ten_prev_char[(count-2)%10]
-                        else:
-                            if ten_prev_char[(count-0)%10] != "Backspace":
-                                str_text = str_text + ten_prev_char[(count-0)%10]
+                    # The 'next' gesture now only confirms the current character
+                    # We don't automatically add characters anymore, only when palm is shown
 
                     if ch1 == "  " and prev_char != "  ":
                         str_text = str_text + "  "
 
                     if ch1 == "Backspace" and prev_char != "Backspace":
                         str_text = str_text[0:-1]
+                    
+                    # Add a 'next' sign implementation
+                    if ch1 == "next" and prev_char not in ["next", "  ", "Backspace"]:
+                        # If previous character was a valid letter, append it to the sentence
+                        str_text = str_text + prev_char
+                        
+                    # Only add character to sentence if palm is shown and it's a valid letter
+                    elif is_palm_shown and ch1 not in ["next", "  ", "Backspace"] and prev_char != ch1:
+                        str_text = str_text + ch1
                     
                     prev_char = ch1
                     current_symbol = ch1
@@ -250,25 +267,127 @@ def process_prediction(white_img, pts):
     if pl in l:
         if distance(pts[8], pts[16]) < 52:
             ch1 = 2
+            
+    # condition for [gh][bdfikruvw]
+    l = [[1, 4], [1, 5], [1, 6], [1, 3], [1, 0]]
+    pl = [ch1, ch2]
+    if pl in l:
+        if pts[6][1] > pts[8][1] and pts[14][1] < pts[16][1] and pts[18][1] < pts[20][1] and pts[0][0] < pts[8][0] and pts[0][0] < pts[12][0] and pts[0][0] < pts[16][0] and pts[0][0] < pts[20][0]:
+            ch1 = 3
+
+    # con for [gh][l]
+    l = [[4, 6], [4, 1], [4, 5], [4, 3], [4, 7]]
+    pl = [ch1, ch2]
+    if pl in l:
+        if pts[4][0] > pts[0][0]:
+            ch1 = 3
+
+    # con for [gh][pqz]
+    l = [[5, 3], [5, 0], [5, 7], [5, 4], [5, 2], [5, 1], [5, 5]]
+    pl = [ch1, ch2]
+    if pl in l:
+        if pts[2][1] + 15 < pts[16][1]:
+            ch1 = 3
+
+    # con for [l][x]
+    l = [[6, 4], [6, 1], [6, 2]]
+    pl = [ch1, ch2]
+    if pl in l:
+        if distance(pts[4], pts[11]) > 55:
+            ch1 = 4
 
     # Map numeric predictions to characters
     if isinstance(ch1, (int, np.integer)):
         if ch1 == 0:
-            ch1 = 'A'
+            # Group 0 - [A, E, M, N, S, T]
+            ch1 = 'S'
+            if pts[4][0] < pts[6][0] and pts[4][0] < pts[10][0] and pts[4][0] < pts[14][0] and pts[4][0] < pts[18][0]:
+                ch1 = 'A'
+            if pts[4][0] > pts[6][0] and pts[4][0] < pts[10][0] and pts[4][0] < pts[14][0] and pts[4][0] < pts[18][0] and pts[4][1] < pts[14][1] and pts[4][1] < pts[18][1]:
+                ch1 = 'T'
+            if pts[4][1] > pts[8][1] and pts[4][1] > pts[12][1] and pts[4][1] > pts[16][1] and pts[4][1] > pts[20][1]:
+                ch1 = 'E'
+            if pts[4][0] > pts[6][0] and pts[4][0] > pts[10][0] and pts[4][0] > pts[14][0] and pts[4][1] < pts[18][1]:
+                ch1 = 'M'
+            if pts[4][0] > pts[6][0] and pts[4][0] > pts[10][0] and pts[4][1] < pts[18][1] and pts[4][1] < pts[14][1]:
+                ch1 = 'N'
         elif ch1 == 1:
+            # Group 1 - [B, D, F, I, K, R, U, V, W]
             ch1 = 'B'
+            if (pts[6][1] > pts[8][1] and pts[10][1] < pts[12][1] and pts[14][1] < pts[16][1] and pts[18][1] < pts[20][1]):
+                ch1 = 'D'
         elif ch1 == 2:
-            ch1 = 'C'
+            # Group 2 - [C, O]
+            if distance(pts[11], pts[4]) > 42:
+                ch1 = 'C'
+            else:
+                ch1 = 'O'
         elif ch1 == 3:
-            ch1 = 'D'
+            # Group 3 - [G, H]
+            if (distance(pts[8], pts[12])) > 72:
+                ch1 = 'G'
+            else:
+                ch1 = 'H'
         elif ch1 == 4:
-            ch1 = 'E'
+            # Group 4 - [L, next]
+            # Check if this is the 'next' sign - specific hand configuration
+            if pts[8][1] < pts[5][1] and pts[12][1] > pts[9][1] and pts[16][1] > pts[13][1] and pts[20][1] > pts[17][1]:
+                ch1 = 'next'
+            else:
+                ch1 = 'next'
         elif ch1 == 5:
-            ch1 = 'F'
+            # Group 5 - [P, Q, Z]
+            if pts[4][0] > pts[12][0] and pts[4][0] > pts[16][0] and pts[4][0] > pts[20][0]:
+                if pts[8][1] < pts[5][1]:
+                    ch1 = 'Z'
+                else:
+                    ch1 = 'Q'
+            # else:
+            #     ch1 = 'P'
         elif ch1 == 6:
-            ch1 = 'G'
+            # Group 6 - [X]
+            ch1 = 'X'
         elif ch1 == 7:
-            ch1 = 'H'
+            # Group 7 - [Y, J]
+            if distance(pts[8], pts[4]) > 42:
+                ch1 = 'Y'
+            else:
+                ch1 = 'J'
+    
+    # Additional letter signs and refinements
+    # Check for specific hand configurations that override the initial classification
+    
+    # F sign
+    if (pts[6][1] < pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] > pts[16][1] and pts[18][1] > pts[20][1]):
+        ch1 = 'F'
+    
+    # I sign
+    if (pts[6][1] < pts[8][1] and pts[10][1] < pts[12][1] and pts[14][1] < pts[16][1] and pts[18][1] > pts[20][1]):
+        ch1 = 'I'
+    
+    # W sign
+    if (pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] > pts[16][1] and pts[18][1] < pts[20][1]):
+        ch1 = 'W'
+    
+    # K sign
+    if (pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] < pts[16][1] and pts[18][1] < pts[20][1]) and pts[4][1] < pts[9][1]:
+        ch1 = 'K'
+    
+    # U sign
+    if ((distance(pts[8], pts[12]) - distance(pts[6], pts[10])) < 8) and (pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] < pts[16][1] and pts[18][1] < pts[20][1]):
+        ch1 = 'U'
+    
+    # V sign
+    if ((distance(pts[8], pts[12]) - distance(pts[6], pts[10])) >= 8) and (pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] < pts[16][1] and pts[18][1] < pts[20][1]) and (pts[4][1] > pts[9][1]):
+        ch1 = 'V'
+    
+    # R sign
+    if (pts[8][0] > pts[12][0]) and (pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] < pts[16][1] and pts[18][1] < pts[20][1]):
+        ch1 = 'R'
+        
+    # Ñ sign (if needed)
+    if ch1 == 'N' and pts[4][0] > pts[6][0] and pts[4][0] > pts[10][0] and pts[4][1] < pts[18][1] and pts[4][1] < pts[14][1] and pts[8][1] < pts[12][1]:
+        ch1 = 'Ñ'
     
     # Check for special gestures
     # Space gesture

@@ -5,6 +5,9 @@ let video;
 let isProcessing = false;
 let processingInterval;
 let currentSuggestions = ["", "", "", ""];
+let cameraStream = null;
+let isCameraRunning = true;
+let processingSpeed = 10; // milliseconds between frame processing (lower = faster, reduced for better synchronization)
 
 // DOM elements
 const webcamElement = document.getElementById('webcam');
@@ -37,7 +40,9 @@ async function initializeWebcam() {
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         webcamElement.srcObject = stream;
+        cameraStream = stream;
         video = webcamElement;
+        isCameraRunning = true;
 
         // Wait for video to be ready
         webcamElement.addEventListener('loadeddata', () => {
@@ -47,6 +52,32 @@ async function initializeWebcam() {
     } catch (error) {
         console.error('Error accessing webcam:', error);
         alert('Error accessing webcam. Please ensure you have granted camera permissions.');
+    }
+}
+
+// Stop the webcam
+function stopCamera() {
+    if (cameraStream) {
+        const tracks = cameraStream.getTracks();
+        tracks.forEach(track => track.stop());
+        webcamElement.srcObject = null;
+        isCameraRunning = false;
+        
+        if (processingInterval) {
+            clearInterval(processingInterval);
+            processingInterval = null;
+        }
+    }
+}
+
+// Start the webcam
+async function startCamera() {
+    if (!isCameraRunning) {
+        try {
+            await initializeWebcam();
+        } catch (error) {
+            console.error('Error restarting camera:', error);
+        }
     }
 }
 
@@ -73,6 +104,24 @@ function setupEventListeners() {
 
     // Clear button
     clearButton.addEventListener('click', clearText);
+    
+    // Camera toggle button
+    const cameraToggleBtn = document.getElementById('camera-toggle');
+    const cameraToggleText = document.getElementById('camera-toggle-text');
+    
+    cameraToggleBtn.addEventListener('click', () => {
+        if (isCameraRunning) {
+            stopCamera();
+            cameraToggleText.textContent = 'Start Camera';
+            cameraToggleBtn.querySelector('i').classList.remove('fa-video');
+            cameraToggleBtn.querySelector('i').classList.add('fa-video-slash');
+        } else {
+            startCamera();
+            cameraToggleText.textContent = 'Stop Camera';
+            cameraToggleBtn.querySelector('i').classList.remove('fa-video-slash');
+            cameraToggleBtn.querySelector('i').classList.add('fa-video');
+        }
+    });
 }
 
 // Start processing frames
@@ -81,29 +130,29 @@ function startProcessing() {
         clearInterval(processingInterval);
     }
 
-    // Process frames every 200ms
+    // Process frames at the specified processing speed
     processingInterval = setInterval(() => {
-        if (!isProcessing && video.readyState === 4) {
+        if (!isProcessing && video && video.readyState === 4 && isCameraRunning) {
             processFrame();
         }
-    }, 200);
+    }, processingSpeed);
 }
 
 // Process a single frame
 async function processFrame() {
     isProcessing = true;
-    loadingIndicator.classList.remove('d-none');
 
     try {
         // Create a canvas to capture the current frame
         const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        // Use smaller dimensions for faster processing and better synchronization
+        canvas.width = 320; // Reduced size for faster processing
+        canvas.height = 240; // Reduced size for faster processing
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Convert the frame to base64
-        const imageData = canvas.toDataURL('image/jpeg');
+        // Convert the frame to base64 with reduced quality for faster transmission
+        const imageData = canvas.toDataURL('image/jpeg', 0.7); // Further reduced quality for faster transmission
 
         // Send the frame to the server for processing
         const response = await fetch('/process_frame', {
@@ -125,7 +174,6 @@ async function processFrame() {
     } catch (error) {
         console.error('Error processing frame:', error);
     } finally {
-        loadingIndicator.classList.add('d-none');
         isProcessing = false;
     }
 }
@@ -152,11 +200,15 @@ function updateUI(result) {
         // Don't display special characters like 'next', 'Backspace', etc.
         if (['next', 'Backspace', '  '].includes(result.character)) {
             currentCharacterElement.textContent = result.character;
+            currentCharacterElement.classList.remove('highlight-character');
         } else {
             currentCharacterElement.textContent = result.character;
+            // Highlight the current character to make it more visible
+            currentCharacterElement.classList.add('highlight-character');
         }
     } else {
         currentCharacterElement.textContent = '-';
+        currentCharacterElement.classList.remove('highlight-character');
     }
 
     // Update sentence

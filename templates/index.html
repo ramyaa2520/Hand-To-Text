@@ -19,16 +19,14 @@
                 <!-- Webcam Feed Column -->
                 <div class="col-lg-6 mb-4">
                     <div class="card shadow">
-                        <div class="card-header bg-primary text-white">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                             <h3 class="mb-0">Webcam Feed</h3>
+                            <button id="camera-toggle" class="btn btn-light">
+                                <i class="fas fa-video"></i> <span id="camera-toggle-text">Stop Camera</span>
+                            </button>
                         </div>
                         <div class="card-body p-0 position-relative">
                             <video id="webcam" class="w-100" autoplay playsinline></video>
-                            <div id="loading-indicator" class="position-absolute top-50 start-50 translate-middle d-none">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
